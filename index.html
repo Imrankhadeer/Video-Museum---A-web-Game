@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="An immersive 3D virtual museum where paintings come alive as videos. Walk through gallery halls and experience the main theater.">
+    <title>Video Museum — Immersive 3D Gallery</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/index.css">
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+</head>
+<body>
+
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="overlay">
+        <div class="loading-content">
+            <div class="loading-icon">
+                <div class="loading-ring"></div>
+                <div class="loading-ring delay"></div>
+            </div>
+            <h1 class="loading-title">VIDEO MUSEUM</h1>
+            <p class="loading-subtitle">Preparing your experience</p>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+            <p class="loading-percentage" id="loading-percentage">0%</p>
+        </div>
+    </div>
+
+    <!-- Start / Click-to-Enter Screen -->
+    <div id="start-screen" class="overlay hidden">
+        <div class="start-content">
+            <h1 class="start-title">VIDEO MUSEUM</h1>
+            <p class="start-subtitle">An Immersive 3D Gallery Experience</p>
+            <div class="start-mode-selection" style="margin-bottom: 2rem; display: flex; flex-direction: column; align-items: center; gap: 0.8rem;">
+                <button id="start-button" class="glow-button" style="width: 280px; padding: 0.8rem 2rem;">Single Player</button>
+                
+                <div class="multiplayer-divider" style="color: var(--color-text-dim); font-size: 0.75rem; letter-spacing: 0.2em; text-transform: uppercase; margin: 0.3rem 0;">— Or Multiplayer —</div>
+                
+                <div class="mp-controls-row" style="display: flex; gap: 0.5rem; align-items: center; width: 280px;">
+                    <button id="mp-host-btn" class="glow-button" style="flex: 1; padding: 0.75rem 1rem; font-size: 0.85rem; border-color: rgba(212, 168, 83, 0.2); background: rgba(212, 168, 83, 0.04);">Host Room</button>
+                </div>
+                <div class="mp-controls-row" style="display: flex; gap: 0.5rem; align-items: center; width: 280px;">
+                    <input type="text" id="mp-room-input" placeholder="ROOM CODE" style="flex: 1.2; text-align: center; text-transform: uppercase; padding: 0.65rem; border-radius: var(--radius-sm); border: 1px solid var(--color-glass-border); background: rgba(0,0,0,0.5); color: var(--color-text); font-family: var(--font-body); font-size: 0.85rem; outline: none; transition: border-color 0.2s;">
+                    <button id="mp-join-btn" class="glow-button" style="flex: 0.8; padding: 0.65rem 1rem; font-size: 0.85rem;">Join</button>
+                </div>
+            </div>
+            <div class="controls-preview">
+                <div class="key-group"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Move</span></div>
+                <div class="key-group"><kbd>Mouse</kbd><span>Look</span></div>
+                <div class="key-group"><kbd>E</kbd><span>Interact</span></div>
+                <div class="key-group"><kbd>Shift</kbd><span>Sprint</span></div>
+                <div class="key-group"><kbd>Space</kbd><span>Jump</span></div>
+                <div class="key-group"><kbd>Esc</kbd><span>Pause</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- HUD Overlay -->
+    <div id="hud" class="hidden">
+        <!-- Room Status Badge (Multiplayer) -->
+        <div id="room-status-badge" class="room-status-panel hidden" style="position: absolute; top: 20px; left: 20px; pointer-events: auto; background: rgba(0,0,0,0.6); backdrop-filter: blur(12px); border: 1px solid var(--color-glass-border); border-radius: var(--radius-md); padding: 0.6rem 1rem; display: flex; align-items: center; gap: 0.8rem; font-size: 0.8rem; font-family: var(--font-body); letter-spacing: 0.05em; z-index: 60;">
+            <div style="width: 8px; height: 8px; border-radius: 50%; background: #4caf50; box-shadow: 0 0 8px #4caf50;" id="room-status-dot"></div>
+            <span id="room-status-text" style="color: var(--color-text); font-weight: 500;">Room Code: ABCD</span>
+            <button id="copy-room-link-btn" title="Copy Invite Link" style="background: var(--color-glass); border: 1px solid var(--color-glass-border); color: var(--color-gold); cursor: pointer; padding: 0.25rem 0.5rem; border-radius: var(--radius-sm); font-size: 0.75rem; transition: background 0.2s;">Copy Link</button>
+        </div>
+
+        <!-- Crosshair -->
+        <div id="crosshair">
+            <div class="crosshair-dot"></div>
+        </div>
+        <!-- Interaction Prompt -->
+        <div id="interaction-prompt" class="hud-prompt"></div>
+        <!-- Room Name Display -->
+        <div id="room-name-display" class="room-name"></div>
+        <!-- Controls Help Panel -->
+        <div id="controls-help" class="controls-panel hidden">
+            <h3>Controls</h3>
+            <ul>
+                <li><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> &mdash; Move</li>
+                <li><kbd>Shift</kbd> &mdash; Sprint</li>
+                <li><kbd>Space</kbd> &mdash; Jump</li>
+                <li><kbd>E</kbd> &mdash; Interact</li>
+                <li><kbd>1</kbd> &mdash; Toggle Remote</li>
+                <li><kbd>H</kbd> &mdash; Toggle Help</li>
+                <li><kbd>Esc</kbd> &mdash; Pause Menu</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Pause Menu -->
+    <div id="pause-menu" class="overlay hidden">
+        <!-- Main Pause Screen -->
+        <div id="pause-main-content" class="glass-panel pause-content">
+            <h2>Paused</h2>
+            <button id="resume-btn" class="menu-btn">Resume</button>
+            <button id="mute-all-btn" class="menu-btn">Mute All Videos</button>
+            <button id="manage-videos-btn" class="menu-btn">Manage Videos</button>
+            <button id="fullscreen-btn" class="menu-btn">Toggle Fullscreen</button>
+        </div>
+
+        <!-- Video Manager Panel (Tile Grid UI) -->
+        <div id="video-manager-panel" class="glass-panel pause-content hidden" style="max-height: 85vh; width: min(800px, 95vw); display: flex; flex-direction: column;">
+            <h2>Manage Screens</h2>
+            <p style="font-size: 0.8rem; color: var(--color-text-muted); margin-top: -1rem; margin-bottom: 1.5rem;">Select a screen to customize its video source.</p>
+            <div class="video-screens-grid" style="flex: 1; overflow-y: auto; padding-right: 8px; margin-bottom: 1.5rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 1rem;">
+                <!-- 9 screen tiles, statically defined for immediate rendering and styling -->
+                <div class="screen-tile" data-index="0">
+                    <div class="screen-tile-header">
+                        <span class="screen-tile-num">Screen 1</span>
+                        <span class="screen-tile-status">Default</span>
+                    </div>
+                    <div class="screen-tile-body">
+                        <div class="screen-tile-icon">🎬</div>
+                        <div class="screen-tile-title">Blazes</div>
+                    </div>
+                    <button class="screen-tile-action">Configure</button>
+                </div>
+                <div class="screen-tile" data-index="1">
+                    <div class="screen-tile-header">
+                        <span class="screen-tile-num">Screen 2</span>
+                        <span class="screen-tile-status">Default</span>
+                    </div>
+                    <div class="screen-tile-body">
+                        <div class="screen-tile-icon">🎬</div>
+                        <div class="screen-tile-title">Escapes</div>
+                    </div>
+                    <button class="screen-tile-action">Configure</button>
+                </div>
+                <div class="screen-tile" data-index="2">
+                    <div class="screen-tile-header">
+                        <span class="screen-tile-num">Screen 3</span>
+                        <span class="screen-tile-status">Default</span>
+                    </div>
+                    <div class="screen-tile-body">
+                        <div class="screen-tile-icon">🎬</div>
+                        <div class="screen-tile-title">Fun</div>
+                    </div>
+                    <button class="screen-tile-action">Configure</button>
+                </div>
+                <div class="screen-tile" data-index="3">
+                    <div class="screen-tile-header">
+                        <span class="screen-tile-num">Screen 4</span>
+                        <span class="screen-tile-status">Default</span>
+                    </div>
+                    <div class="screen-tile-body">
+                        <div class="screen-tile-icon">🎬</div>
+                        <div class="screen-tile-title">Joyrides</div>
+                    </div>
+                    <button class="screen-tile-action">Configure</button>
+                </div>
+                <div class="screen-tile" data-index="4">
+                    <div class="screen-tile-header">
+                        <span class="screen-tile-num">Screen 5</span>
+                        <span class="screen-tile-status">Default</span>
+                    </div>
+                    <div class="screen-tile-body">
+                        <div class="screen-tile-icon">🎬</div>
+                        <div class="screen-tile-title">Meltdowns</div>
+                    </div>
+                    <button class="screen-tile-action">Configure</button>
+                </div>
+                <div class="screen-tile" data-index="5">
+                    <div class="screen-tile-header">
+                        <span class="screen-tile-num">Screen 6</span>
+                        <span class="screen-tile-status">Default</span>
+                    </div>
+                    <div class="screen-tile-body">
+                        <div class="screen-tile-icon">🎬</div>
+                        <div class="screen-tile-title">Subaru</div>
+                    </div>
+                    <button class="screen-tile-action">Configure</button>
+                </div>
+                <div class="screen-tile" data-index="6">
+                    <div class="screen-tile-header">
+                        <span class="screen-tile-num">Screen 7</span>
+                        <span class="screen-tile-status">Default</span>
+                    </div>
+                    <div class="screen-tile-body">
+                        <div class="screen-tile-icon">🎬</div>
+                        <div class="screen-tile-title">GTI Review</div>
+                    </div>
+                    <button class="screen-tile-action">Configure</button>
+                </div>
+                <div class="screen-tile" data-index="7">
+                    <div class="screen-tile-header">
+                        <span class="screen-tile-num">Screen 8</span>
+                        <span class="screen-tile-status">Default</span>
+                    </div>
+                    <div class="screen-tile-body">
+                        <div class="screen-tile-icon">🎬</div>
+                        <div class="screen-tile-title">Bullrun</div>
+                    </div>
+                    <button class="screen-tile-action">Configure</button>
+                </div>
+                <div class="screen-tile theater-tile" data-index="8">
+                    <div class="screen-tile-header">
+                        <span class="screen-tile-num" style="color: var(--color-gold);">Theater Main Screen</span>
+                        <span class="screen-tile-status">Default</span>
+                    </div>
+                    <div class="screen-tile-body">
+                        <div class="screen-tile-icon" style="color: var(--color-gold);">⭐</div>
+                        <div class="screen-tile-title" style="color: var(--color-gold-light); font-weight: 600;">Big Buck Bunny</div>
+                    </div>
+                    <button class="screen-tile-action" style="border-color: rgba(212, 168, 83, 0.4); color: var(--color-gold);">Configure</button>
+                </div>
+            </div>
+            <button id="video-manager-back-btn" class="menu-btn">Back to Menu</button>
+        </div>
+
+        <!-- Screen Editor Popup Modal -->
+        <div id="screen-editor-modal" class="glass-panel pause-content hidden" style="z-index: 250; max-height: 80vh; width: min(420px, 92vw); position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,0.8); border: 1px solid rgba(212,168,83,0.3);">
+            <h2 id="editor-screen-title" style="font-size: 1.3rem; margin-bottom: 1.5rem;">Configure Screen</h2>
+            <div class="editor-body" style="text-align: left; margin-bottom: 1.5rem; flex: 1;">
+                <div class="form-group" style="margin-bottom: 1.2rem;">
+                    <label style="display: block; font-size: 0.8rem; margin-bottom: 0.4rem; color: var(--color-text-muted); font-weight: 500;">VIDEO URL / LOCAL PATH</label>
+                    <input type="text" id="editor-video-url" class="video-url-input" style="width: 100%;" placeholder="Enter URL or /local-path.mp4">
+                    <span style="font-size: 0.65rem; color: var(--color-text-dim); display: block; margin-top: 0.25rem;">Note: For multiplayer, direct web URLs are synced to all players.</span>
+                </div>
+                <div class="form-group" style="margin-bottom: 1.2rem;">
+                    <label style="display: block; font-size: 0.8rem; margin-bottom: 0.4rem; color: var(--color-text-muted); font-weight: 500;">OR SELECT LOCAL FILE</label>
+                    <label class="file-upload-btn" style="display: block; width: 100%; padding: 0.75rem;">
+                        Browse Video File
+                        <input type="file" id="editor-video-file" accept="video/*">
+                    </label>
+                    <div id="editor-file-status" style="font-size: 0.75rem; color: var(--color-text-dim); text-align: center; margin-top: 0.4rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">No file selected</div>
+                </div>
+            </div>
+            <div class="editor-actions" style="display: flex; gap: 0.75rem; margin-top: auto;">
+                <button id="editor-apply-btn" class="menu-btn" style="flex: 1; border-color: rgba(212,168,83,0.6); color: var(--color-gold);">Apply</button>
+                <button id="editor-cancel-btn" class="menu-btn" style="flex: 1; background: rgba(255, 0, 0, 0.04); border-color: rgba(255, 0, 0, 0.15);">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Three.js Canvas Container -->
+    <div id="canvas-container"></div>
+
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html>
