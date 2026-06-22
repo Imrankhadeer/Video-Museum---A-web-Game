@@ -53,6 +53,8 @@ const VIDEO_CONFIG = [
   { url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4', title: 'Bullrun' },
   // Theater main screen (the big one!)
   { url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', title: 'Big Buck Bunny' },
+  // Lobby screen
+  { url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4', title: 'Tears of Steel' },
 ];
 
 try {
@@ -134,6 +136,7 @@ loadingScreen.setProgress(45);
 
 // Place video screens at each slot position
 const screenPositions = []; // parallel array for proximity audio
+const dynamicScreenLights = []; // store lights for gallery screens
 
 museum.screenSlots.forEach((slot) => {
   const texture = videoManager.getTexture(slot.index);
@@ -155,6 +158,14 @@ museum.screenSlots.forEach((slot) => {
     videoIndex: slot.index 
   };
   
+  // Add a dynamic PointLight to smaller screens so they emit light into the room
+  if (slot.type !== 'theater') {
+    const dLight = new THREE.PointLight(0xffffff, 5, 8); // White, moderate intensity, 8m range
+    dLight.position.set(0, 0, 1.5); // 1.5m in front of the screen
+    screenMesh.add(dLight);
+    dynamicScreenLights.push({ index: slot.index, light: dLight });
+  }
+
   scene.add(screenMesh);
 
   // Store screen world position for proximity audio
@@ -192,6 +203,12 @@ document.addEventListener('keydown', (e) => {
   if (e.code === 'Digit1') {
     isRemoteVisible = !isRemoteVisible;
     remoteControl.group.visible = isRemoteVisible;
+    
+    const remoteHint = document.getElementById('remote-hint');
+    if (remoteHint) {
+      if (isRemoteVisible) remoteHint.classList.remove('hidden');
+      else remoteHint.classList.add('hidden');
+    }
   }
 });
 
@@ -364,8 +381,15 @@ menuScreen.onVideoChange((index, url, file) => {
   if (file) {
     const objectURL = URL.createObjectURL(file);
     videoManager.changeVideoSource(index, objectURL, file.name);
-    // Broadcast name of file (cannot send raw binary, but registers name)
+    
+    // Broadcast the name to the chat/UI
     multiplayerManager.broadcastVideoChange(index, '', file.name);
+    
+    // Attempt P2P streaming!
+    const stream = videoManager.getStream(index);
+    if (stream) {
+      multiplayerManager.broadcastLocalVideoStream(index, stream, file.name);
+    }
   } else if (url) {
     let title = 'Custom Video';
     try {
@@ -446,7 +470,7 @@ async function initGame() {
 // ANIMATION LOOP
 // ============================================
 const clock = new THREE.Clock();
-let theaterLightTimer = 0;
+let screenLightTimer = 0;
 const THEATER_VIDEO_INDEX = 8;
 
 function animate() {
@@ -497,13 +521,22 @@ function animate() {
       theaterVideo.volume = vol;
     }
 
-    // --- Theater Screen Light Color ---
+    // --- Dynamic Screen Light Color ---
     // Sample the video frame color every ~100ms for performance
-    theaterLightTimer += deltaTime;
-    if (theaterLightTimer > 0.1) {
-      theaterLightTimer = 0;
+    screenLightTimer += deltaTime;
+    if (screenLightTimer > 0.1) {
+      screenLightTimer = 0;
+      
+      // Theater light
       const avgColor = videoManager.getAverageColor(THEATER_VIDEO_INDEX);
       lighting.updateTheaterLight(avgColor);
+
+      // Gallery lights
+      dynamicScreenLights.forEach(obj => {
+        const c = videoManager.getAverageColor(obj.index);
+        obj.light.color.copy(c);
+        obj.light.intensity = 5 + c.getHSL({}).l * 10;
+      });
     }
   }
 

@@ -55,9 +55,42 @@ export class VideoManager {
       this.configs[index].title = title;
     }
 
+    video.srcObject = null; // Clear any active WebRTC streams
     video.src = sourceUrl;
     video.load();
     video.play().catch(() => {});
+  }
+
+  /**
+   * Dynamically replace the screen video source with a live WebRTC MediaStream.
+   */
+  setVideoStream(index, stream, title) {
+    const video = this.videos[index];
+    if (!video) return;
+
+    if (title && this.configs[index]) {
+      this.configs[index].title = title;
+    }
+
+    video.removeAttribute('src'); // Clear regular source
+    video.srcObject = stream;
+    video.play().catch(() => {});
+  }
+
+  /**
+   * Capture and return the MediaStream from a local video element.
+   */
+  getStream(index) {
+    const video = this.videos[index];
+    if (!video) return null;
+    
+    // Support standard and Firefox-specific methods
+    if (typeof video.captureStream === 'function') {
+      return video.captureStream();
+    } else if (typeof video.mozCaptureStream === 'function') {
+      return video.mozCaptureStream();
+    }
+    return null;
   }
 
   /**
@@ -126,6 +159,62 @@ export class VideoManager {
     const video = this.videos[index];
     if (!video) return;
     video.currentTime = Math.max(0, video.currentTime + seconds);
+  }
+
+  /**
+   * Extract the current playback state of all videos (for Master Clock syncing).
+   */
+  getVideoStates() {
+    return this.videos.map((v, i) => ({
+      index: i,
+      url: v.src,
+      currentTime: v.currentTime,
+      paused: v.paused,
+      muted: v.muted,
+      title: this.configs[i]?.title || 'Video',
+      hasStream: !!v.srcObject
+    }));
+  }
+
+  /**
+   * Force local videos to match a provided remote state (for Master Clock syncing).
+   */
+  syncVideoState(states) {
+    if (!states || !Array.isArray(states)) return;
+    states.forEach(state => {
+      const v = this.videos[state.index];
+      if (!v) return;
+
+      if (state.title && this.configs[state.index]) {
+        this.configs[state.index].title = state.title;
+      }
+
+      // 1. Sync URL (only if it's a valid remote URL and not currently using a P2P stream)
+      if (state.url && state.url.startsWith('http') && !v.srcObject && !state.hasStream) {
+        // Simple check to avoid reloading the same video over and over
+        if (v.src !== state.url && !v.src.endsWith(state.url)) {
+          v.src = state.url;
+          v.load();
+        }
+      }
+
+      // 2. Sync Time (Anti-Drift): Snap time if off by more than 1 second
+      if (typeof state.currentTime === 'number' && Math.abs(v.currentTime - state.currentTime) > 1.0) {
+        v.currentTime = state.currentTime;
+      }
+
+      // 3. Sync Play/Pause
+      if (state.paused === true && !v.paused) {
+        v.pause();
+      } else if (state.paused === false && v.paused) {
+        v.play().catch(() => {});
+      }
+
+      // 4. Sync Mute
+      if (state.muted !== undefined) {
+        v.muted = state.muted;
+      }
+    });
   }
 
   /**

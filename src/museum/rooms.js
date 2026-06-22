@@ -71,6 +71,8 @@ export function createMuseum() {
     { position: new THREE.Vector3(7.95, 2.5, -31), rotation: new THREE.Euler(0, -Math.PI / 2, 0), size: { w: 2.4, h: 1.6 }, type: 'gallery', index: 7 },
     // --- Theater main screen (Z=-65.7, faces +Z) ---
     { position: new THREE.Vector3(0, 4.375, -65.7), rotation: new THREE.Euler(0, 0, 0), size: { w: 12, h: 6.75 }, type: 'theater', index: 8 },
+    // --- Lobby screen (left wall) ---
+    { position: new THREE.Vector3(-7.95, 2.5, -6), rotation: new THREE.Euler(0, Math.PI / 2, 0), size: { w: 3.6, h: 2.4 }, type: 'gallery', index: 9 },
   ];
 
   // =====================================================================

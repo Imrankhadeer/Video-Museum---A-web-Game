@@ -25,8 +25,8 @@ export class PlayerController {
     this.seated = false; // when player sits on sofa
 
     // Movement config
-    this.SPEED = 8;         // walk speed
-    this.SPRINT_SPEED = 14; // sprint speed
+    this.SPEED = 15;        // walk speed
+    this.SPRINT_SPEED = 45; // sprint speed
     this.JUMP_VELOCITY = 6;
     this.GRAVITY = 25;
 

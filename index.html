@@ -60,13 +60,6 @@
 
     <!-- HUD Overlay -->
     <div id="hud" class="hidden">
-        <!-- Room Status Badge (Multiplayer) -->
-        <div id="room-status-badge" class="room-status-panel hidden" style="position: absolute; top: 20px; left: 20px; pointer-events: auto; background: rgba(0,0,0,0.6); backdrop-filter: blur(12px); border: 1px solid var(--color-glass-border); border-radius: var(--radius-md); padding: 0.6rem 1rem; display: flex; align-items: center; gap: 0.8rem; font-size: 0.8rem; font-family: var(--font-body); letter-spacing: 0.05em; z-index: 60;">
-            <div style="width: 8px; height: 8px; border-radius: 50%; background: #4caf50; box-shadow: 0 0 8px #4caf50;" id="room-status-dot"></div>
-            <span id="room-status-text" style="color: var(--color-text); font-weight: 500;">Room Code: ABCD</span>
-            <button id="copy-room-link-btn" title="Copy Invite Link" style="background: var(--color-glass); border: 1px solid var(--color-glass-border); color: var(--color-gold); cursor: pointer; padding: 0.25rem 0.5rem; border-radius: var(--radius-sm); font-size: 0.75rem; transition: background 0.2s;">Copy Link</button>
-        </div>
-
         <!-- Crosshair -->
         <div id="crosshair">
             <div class="crosshair-dot"></div>
@@ -88,6 +81,12 @@
                 <li><kbd>Esc</kbd> &mdash; Pause Menu</li>
             </ul>
         </div>
+        <!-- Remote Hint -->
+        <div id="remote-hint" class="hidden" style="position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.6); border: 1px solid var(--color-glass-border); border-radius: var(--radius-md); padding: 0.6rem 1.2rem; display: flex; gap: 1.5rem; font-size: 0.85rem; color: var(--color-text); backdrop-filter: blur(8px);">
+            <span><kbd style="color: var(--color-gold)">Left Click</kbd> Play / Pause</span>
+            <span><kbd style="color: var(--color-gold)">Right Click</kbd> Mute</span>
+            <span><kbd style="color: var(--color-gold)">Scroll</kbd> Seek</span>
+        </div>
     </div>
 
     <!-- Pause Menu -->
@@ -95,6 +94,11 @@
         <!-- Main Pause Screen -->
         <div id="pause-main-content" class="glass-panel pause-content">
             <h2>Paused</h2>
+            <div id="room-status-badge" class="room-status-panel hidden" style="background: rgba(0,0,0,0.4); border: 1px solid var(--color-glass-border); border-radius: var(--radius-md); padding: 0.8rem; margin-bottom: 1.5rem; align-items: center; justify-content: center; gap: 0.8rem; font-size: 0.9rem; font-family: var(--font-body); letter-spacing: 0.05em;">
+                <div style="width: 8px; height: 8px; border-radius: 50%; background: #4caf50; box-shadow: 0 0 8px #4caf50;" id="room-status-dot"></div>
+                <span id="room-status-text" style="color: var(--color-text); font-weight: 500;">Room Code: ABCD</span>
+                <button id="copy-room-link-btn" title="Copy Invite Link" style="background: var(--color-glass); border: 1px solid var(--color-glass-border); color: var(--color-gold); cursor: pointer; padding: 0.35rem 0.7rem; border-radius: var(--radius-sm); font-size: 0.8rem; transition: background 0.2s;">Copy Link</button>
+            </div>
             <button id="resume-btn" class="menu-btn">Resume</button>
             <button id="mute-all-btn" class="menu-btn">Mute All Videos</button>
             <button id="manage-videos-btn" class="menu-btn">Manage Videos</button>
@@ -205,6 +209,17 @@
                         <div class="screen-tile-title" style="color: var(--color-gold-light); font-weight: 600;">Big Buck Bunny</div>
                     </div>
                     <button class="screen-tile-action" style="border-color: rgba(212, 168, 83, 0.4); color: var(--color-gold);">Configure</button>
+                </div>
+                <div class="screen-tile" data-index="9">
+                    <div class="screen-tile-header">
+                        <span class="screen-tile-num">Lobby Screen</span>
+                        <span class="screen-tile-status">Default</span>
+                    </div>
+                    <div class="screen-tile-body">
+                        <div class="screen-tile-icon">🎬</div>
+                        <div class="screen-tile-title">Tears of Steel</div>
+                    </div>
+                    <button class="screen-tile-action">Configure</button>
                 </div>
             </div>
             <button id="video-manager-back-btn" class="menu-btn">Back to Menu</button>

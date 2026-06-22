@@ -66,6 +66,7 @@ export class MultiplayerManager {
     }
 
     this.peer = new Peer(this.peerId);
+    this._setupPeer();
 
     this.peer.on('open', (id) => {
       console.log(`Successfully hosting room! Code: ${code}`);
@@ -100,6 +101,7 @@ export class MultiplayerManager {
     }
 
     this.peer = new Peer(this.peerId);
+    this._setupPeer();
 
     this.peer.on('open', (id) => {
       console.log(`Connecting to room ${this.roomCode}...`);
@@ -110,6 +112,36 @@ export class MultiplayerManager {
     this.peer.on('error', (err) => {
       console.error('PeerJS connection error:', err);
       alert(`Could not connect to room: ${this.roomCode}. Please check code and try again.`);
+    });
+  }
+
+  _setupPeer() {
+    // Listen for incoming MediaStream calls (True P2P Streaming)
+    this.peer.on('call', (call) => {
+      // Answer immediately (one-way video stream, no return stream)
+      call.answer();
+
+      call.on('stream', (remoteStream) => {
+        const meta = call.metadata || {};
+        if (meta.type === 'local_video' && typeof meta.index === 'number') {
+          console.log(`[WebRTC] Receiving live video stream for screen ${meta.index}`);
+          
+          this.videoManager.setVideoStream(meta.index, remoteStream, meta.title);
+          
+          const tile = document.querySelector(`.screen-tile[data-index="${meta.index}"]`);
+          if (tile) {
+            tile.classList.add('custom-src');
+            const titleEl = tile.querySelector('.screen-tile-title');
+            const statusEl = tile.querySelector('.screen-tile-status');
+            if (titleEl) titleEl.textContent = meta.title || 'Live Stream';
+            if (statusEl) statusEl.textContent = 'Live (P2P)';
+          }
+        }
+      });
+
+      call.on('error', (err) => {
+        console.error('WebRTC Media Call Error:', err);
+      });
     });
   }
 
@@ -174,6 +206,15 @@ export class MultiplayerManager {
           this._createRemotePlayer(senderPeerId, hName);
         }
         if (this.isHost) {
+          // Send initial video state to the new guest so they catch up instantly
+          const conn = this.connections[senderPeerId];
+          if (conn && conn.open) {
+            conn.send({
+              type: 'initial_state',
+              states: this.videoManager.getVideoStates()
+            });
+          }
+
           Object.keys(this.connections).forEach((guestId) => {
             if (guestId !== senderPeerId) {
               this.connections[guestId].send({
@@ -183,6 +224,20 @@ export class MultiplayerManager {
               });
             }
           });
+        }
+        break;
+
+      case 'initial_state':
+        // Guest receives initial state from Host
+        if (!this.isHost && data.states) {
+          this.videoManager.syncVideoState(data.states);
+        }
+        break;
+
+      case 'sync_pulse':
+        // Guest receives periodic sync clock from Host
+        if (!this.isHost && data.states) {
+          this.videoManager.syncVideoState(data.states);
         }
         break;
 
@@ -233,6 +288,12 @@ export class MultiplayerManager {
       case 'video_cmd':
         if (typeof data.index !== 'number' || data.index < 0 || data.index > 8) return;
         
+        // Sync time if provided in the command packet
+        const v = this.videoManager.getVideo(data.index);
+        if (v && typeof data.time === 'number') {
+           v.currentTime = data.time;
+        }
+
         if (data.command === 'togglePlayPause') {
           this.videoManager.togglePlayPause(data.index);
         } else if (data.command === 'toggleMute') {
@@ -292,14 +353,38 @@ export class MultiplayerManager {
    * Broadcast a video remote command (play/pause/seek/mute)
    */
   broadcastVideoCommand(index, command, value = 0) {
+    const v = this.videoManager.getVideo(index);
+    const time = v ? v.currentTime : 0;
+    
     const payload = {
       type: 'video_cmd',
       index,
       command,
-      value
+      value,
+      time // Send current time so everyone perfectly aligns
     };
     Object.values(this.connections).forEach((conn) => {
       if (conn.open) conn.send(payload);
+    });
+  }
+
+  /**
+   * P2P Stream Broadcast: Pipe the local video stream to all connected peers!
+   */
+  broadcastLocalVideoStream(index, stream, title) {
+    if (!this.peer || !stream) return;
+    
+    const safeTitle = String(title || 'Live Stream').substring(0, 50);
+
+    Object.keys(this.connections).forEach((guestId) => {
+      console.log(`[WebRTC] Initiating video stream call to ${guestId}...`);
+      this.peer.call(guestId, stream, {
+        metadata: {
+          type: 'local_video',
+          index: index,
+          title: safeTitle
+        }
+      });
     });
   }
 
@@ -328,6 +413,18 @@ export class MultiplayerManager {
     if (this.lastUpdateTime >= this.updateInterval) {
       this.lastUpdateTime = 0;
       this._broadcastLocalPosition();
+    }
+    
+    // Master Clock: Send sync pulse every 5 seconds if Host
+    if (this.isHost) {
+      this.syncTimer = (this.syncTimer || 0) + deltaTime;
+      if (this.syncTimer >= 5.0) {
+        this.syncTimer = 0;
+        const states = this.videoManager.getVideoStates();
+        Object.values(this.connections).forEach((conn) => {
+          if (conn.open) conn.send({ type: 'sync_pulse', states });
+        });
+      }
     }
 
     // 2. Smoothly interpolate other player avatars in the 3D scene
@@ -479,6 +576,7 @@ export class MultiplayerManager {
 
   _showRoomHUD() {
     this.statusPanel.classList.remove('hidden');
+    this.statusPanel.style.display = 'flex';
     this.statusText.textContent = `Room: ${this.roomCode}`;
   }
 
@@ -501,5 +599,6 @@ export class MultiplayerManager {
     this.remotePlayers = {};
     this.connections = {};
     this.statusPanel.classList.add('hidden');
+    this.statusPanel.style.display = 'none';
   }
 }
