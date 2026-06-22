@@ -23,6 +23,7 @@ export class MultiplayerManager {
 
     this.lastUpdateTime = 0;
     this.updateInterval = 0.04; // send position ~25 times/sec
+    this.rateLimits = {}; // peerId -> { count, lastReset }
 
     // Unique username for this session
     this.username = 'Player_' + Math.floor(Math.random() * 900 + 100);
@@ -147,20 +148,38 @@ export class MultiplayerManager {
   }
 
   _handleNetworkMessage(senderPeerId, data) {
+    if (!data || typeof data !== 'object' || !data.type) return;
+
+    // 1. Rate Limiting (Anti-Spam)
+    const now = performance.now();
+    if (!this.rateLimits[senderPeerId]) {
+      this.rateLimits[senderPeerId] = { count: 0, lastReset: now };
+    }
+    const rl = this.rateLimits[senderPeerId];
+    if (now - rl.lastReset > 1000) {
+      rl.count = 0;
+      rl.lastReset = now;
+    }
+    rl.count++;
+    if (rl.count > 60) {
+      console.warn(`[Security] Dropping spam from ${senderPeerId}`);
+      return; // Drop packets from spammers
+    }
+
     switch (data.type) {
       case 'handshake':
-        // Store username and reply with ours
+        // 4. Username Sanitization
+        let hName = String(data.username || 'Unknown').substring(0, 20);
         if (!this.remotePlayers[senderPeerId]) {
-          this._createRemotePlayer(senderPeerId, data.username);
+          this._createRemotePlayer(senderPeerId, hName);
         }
         if (this.isHost) {
-          // Tell all guests about all other active connections
           Object.keys(this.connections).forEach((guestId) => {
             if (guestId !== senderPeerId) {
               this.connections[guestId].send({
                 type: 'peer_joined',
                 peerId: senderPeerId,
-                username: data.username,
+                username: hName,
               });
             }
           });
@@ -168,50 +187,62 @@ export class MultiplayerManager {
         break;
 
       case 'peer_joined':
-        // A new guest joined (relayed by Host)
-        this._createRemotePlayer(data.peerId, data.username);
+        let pName = String(data.username || 'Unknown').substring(0, 20);
+        this._createRemotePlayer(data.peerId, pName);
         break;
 
       case 'pos':
-        // Update peer position
+        if (!data.pos || !data.rot) return;
+
+        // 2. Position Sanitization & Anti-Fly
+        let px = Number(data.pos.x) || 0;
+        let py = Number(data.pos.y) || 0;
+        let pz = Number(data.pos.z) || 0;
+        let rx = Number(data.rot.x) || 0;
+        let ry = Number(data.rot.y) || 0;
+        let rz = Number(data.rot.z) || 0;
+
+        // Bounds Checking (Clamping)
+        const maxDist = 200; 
+        px = Math.max(-maxDist, Math.min(maxDist, px));
+        py = Math.max(-10, Math.min(100, py));
+        pz = Math.max(-maxDist, Math.min(maxDist, pz));
+
         const rp = this.remotePlayers[senderPeerId];
         if (rp) {
-          rp.targetPos.set(data.pos.x, data.pos.y, data.pos.z);
-          rp.targetRot.set(data.rot.x, data.rot.y, data.rot.z);
-          rp.isSprinting = data.sprint;
+          rp.targetPos.set(px, py, pz);
+          rp.targetRot.set(rx, ry, rz);
+          rp.isSprinting = !!data.sprint;
         }
 
-        // Relay position if Host
         if (this.isHost) {
           Object.keys(this.connections).forEach((guestId) => {
             if (guestId !== senderPeerId) {
               this.connections[guestId].send({
                 type: 'pos',
                 peerId: senderPeerId,
-                pos: data.pos,
-                rot: data.rot,
-                sprint: data.sprint,
+                pos: { x: px, y: py, z: pz },
+                rot: { x: rx, y: ry, z: rz },
+                sprint: !!data.sprint,
               });
             }
           });
         }
         break;
 
-      case 'video':
-        // Update screen video source
-        this.videoManager.changeVideoSource(data.index, data.url, data.title);
+      case 'video_cmd':
+        if (typeof data.index !== 'number' || data.index < 0 || data.index > 8) return;
         
-        // Sync tile title in video manager UI if it is active
-        const tile = document.querySelector(`.screen-tile[data-index="${data.index}"]`);
-        if (tile) {
-          tile.classList.add('custom-src');
-          const titleEl = tile.querySelector('.screen-tile-title');
-          const statusEl = tile.querySelector('.screen-tile-status');
-          if (titleEl) titleEl.textContent = data.title;
-          if (statusEl) statusEl.textContent = 'Custom';
+        if (data.command === 'togglePlayPause') {
+          this.videoManager.togglePlayPause(data.index);
+        } else if (data.command === 'toggleMute') {
+          this.videoManager.toggleMute(data.index);
+        } else if (data.command === 'seek' && typeof data.value === 'number') {
+          // Clamp seek value
+          let seekAmount = Math.max(-30, Math.min(30, data.value));
+          this.videoManager.seekVideo(data.index, seekAmount);
         }
 
-        // Relay video if Host
         if (this.isHost) {
           Object.keys(this.connections).forEach((guestId) => {
             if (guestId !== senderPeerId) {
@@ -220,7 +251,56 @@ export class MultiplayerManager {
           });
         }
         break;
+
+      case 'video':
+        // 3. Video Validation (Anti-XSS & Trolling)
+        if (typeof data.index !== 'number' || data.index < 0 || data.index > 8) return;
+        
+        const urlStr = String(data.url || '');
+        if (!urlStr.startsWith('http://') && !urlStr.startsWith('https://') && !urlStr.startsWith('blob:')) {
+          console.warn('[Security] Dropped invalid video URL payload');
+          return;
+        }
+        
+        const safeTitle = String(data.title || 'Custom Video').substring(0, 50);
+
+        this.videoManager.changeVideoSource(data.index, urlStr, safeTitle);
+        
+        const tile = document.querySelector(`.screen-tile[data-index="${data.index}"]`);
+        if (tile) {
+          tile.classList.add('custom-src');
+          const titleEl = tile.querySelector('.screen-tile-title');
+          const statusEl = tile.querySelector('.screen-tile-status');
+          if (titleEl) titleEl.textContent = safeTitle;
+          if (statusEl) statusEl.textContent = 'Custom';
+        }
+
+        if (this.isHost) {
+          data.url = urlStr;
+          data.title = safeTitle;
+          Object.keys(this.connections).forEach((guestId) => {
+            if (guestId !== senderPeerId) {
+              this.connections[guestId].send(data);
+            }
+          });
+        }
+        break;
     }
+  }
+
+  /**
+   * Broadcast a video remote command (play/pause/seek/mute)
+   */
+  broadcastVideoCommand(index, command, value = 0) {
+    const payload = {
+      type: 'video_cmd',
+      index,
+      command,
+      value
+    };
+    Object.values(this.connections).forEach((conn) => {
+      if (conn.open) conn.send(payload);
+    });
   }
 
   /**
@@ -328,7 +408,7 @@ export class MultiplayerManager {
       emissiveIntensity: 1.5,
     });
     const visorMesh = new THREE.Mesh(visorGeo, visorMat);
-    visorMesh.position.set(0, 1.15, 0.2); // front head area
+    visorMesh.position.set(0, 1.15, -0.2); // front head area (negative Z is forward)
     group.add(visorMesh);
 
     // Head sphere

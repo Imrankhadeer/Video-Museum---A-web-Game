@@ -217,10 +217,12 @@ document.addEventListener('mousedown', (e) => {
       // Left click: Play/Pause
       remoteControl.animateButtonPress('play');
       videoManager.togglePlayPause(screenIndex);
+      multiplayerManager.broadcastVideoCommand(screenIndex, 'togglePlayPause');
     } else if (e.button === 1 || e.button === 2) {
       // Middle or Right click: Mute/Unmute
       remoteControl.animateButtonPress('mute');
       videoManager.toggleMute(screenIndex);
+      multiplayerManager.broadcastVideoCommand(screenIndex, 'toggleMute');
     }
   }
 });
@@ -233,10 +235,12 @@ document.addEventListener('wheel', (e) => {
       // Scroll up: FF
       remoteControl.animateButtonPress('ff');
       videoManager.seekVideo(screenIndex, 5);
+      multiplayerManager.broadcastVideoCommand(screenIndex, 'seek', 5);
     } else {
       // Scroll down: RW
       remoteControl.animateButtonPress('rw');
       videoManager.seekVideo(screenIndex, -5);
+      multiplayerManager.broadcastVideoCommand(screenIndex, 'seek', -5);
     }
   }
 });
