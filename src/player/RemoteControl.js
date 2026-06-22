@@ -68,12 +68,17 @@ export class RemoteControl {
     btn.position.y = 0.007; // push in slightly
 
     // Small recoil animation for the whole remote
-    const origZ = this.group.position.z;
-    this.group.position.z += 0.01;
+    if (this.animTimer) {
+      clearTimeout(this.animTimer);
+    } else {
+      this.baseZ = this.group.position.z;
+      this.group.position.z += 0.01;
+    }
 
-    setTimeout(() => {
+    this.animTimer = setTimeout(() => {
       btn.position.y = originalY;
-      this.group.position.z = origZ;
+      this.group.position.z = this.baseZ;
+      this.animTimer = null;
     }, 150);
   }
 }
