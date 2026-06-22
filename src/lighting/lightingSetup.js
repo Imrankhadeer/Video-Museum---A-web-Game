@@ -76,7 +76,7 @@ export function setupLighting(scene) {
   scene.add(theaterRectLight);
 
   // Very dim ambient in theater so it's not pitch black
-  const theaterAmbient = new THREE.PointLight(0x111122, 5, 25);
+  const theaterAmbient = new THREE.PointLight(0x111122, 0.3, 25);
   theaterAmbient.position.set(0, 6, -56);
   scene.add(theaterAmbient);
 
@@ -86,7 +86,7 @@ export function setupLighting(scene) {
     updateTheaterLight(color) {
       // color: THREE.Color - average color from video frame
       theaterRectLight.color.copy(color);
-      theaterRectLight.intensity = 15 + color.getHSL({}).l * 10; // brighter for bright scenes
+      theaterRectLight.intensity = 5 + color.getHSL({}).l * 15; // brighter for bright scenes
     },
   };
 }
