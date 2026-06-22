@@ -219,8 +219,12 @@ function getTargetedScreen() {
   raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
   const intersects = raycaster.intersectObjects(scene.children, true);
   for (const hit of intersects) {
-    if (hit.object.userData && hit.object.userData.isScreen) {
-      return hit.object.userData.videoIndex;
+    let current = hit.object;
+    while (current) {
+      if (current.userData && current.userData.isScreen) {
+        return current.userData.videoIndex;
+      }
+      current = current.parent;
     }
   }
   return -1;
